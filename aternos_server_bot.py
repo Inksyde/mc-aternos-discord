@@ -1,84 +1,77 @@
 import discord
 import os
+import asyncio
 from python_aternos import Client
-import time
-from flask import Flask
-from threading import Thread
 
-# --- KEEP ALIVE SECTION FOR RENDER ---
-app = Flask('')
+# --- CONFIGURATION ---
+TOKEN = os.environ.get('DISCORD_TOKEN')
+ATERNOS_SESSION = os.environ.get('ATERNOS_SESSION')
 
-@app.route('/')
-def home():
-    return "Bot is alive!"
+# Initialize Discord Bot
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
 
-def run_web_server():
-    app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run_web_server)
-    t.start()
-# -------------------------------------
-
-# Environment Variables
-TOKEN = os.environ.get("DISCORD_TOKEN")
-# We use the session cookie now to bypass the login screen
-ATERNOS_SESSION = os.environ.get("ATERNOS_SESSION")
-
-client = discord.Client()
-
-# Connect to Aternos using the Session Cookie
-try:
-    # This bypasses the username/password login page
-    aternos = Client.from_cookies(ATERNOS_SESSION)
-    atservers = aternos.servers
-    myserv = atservers[0]
-    print("Successfully connected to Aternos via Session!")
-except Exception as e:
-    print(f"Aternos Connection Error: {e}")
-    myserv = None
+def get_aternos_server():
+    """Attempts to connect to Aternos and return the server object."""
+    try:
+        # Connect using the session cookie
+        at = Client.from_cookies(ATERNOS_SESSION)
+        
+        # Get the list of servers
+        at_servers = at.list_servers()
+        
+        if not at_servers:
+            print("ERROR: No servers found on this Aternos account.")
+            return None
+            
+        # Return the first server in the account
+        return at_servers[0]
+    except Exception as e:
+        print(f"DEBUG: Aternos Connection Error: {e}")
+        return None
 
 @client.event
 async def on_ready():
-    print('Logged in as {0.user}'.format(client))
+    print(f'Logged in as {client.user} (ID: {client.user.id})')
+    print('------')
 
 @client.event
 async def on_message(message):
+    # Ignore messages from the bot itself
     if message.author == client.user:
         return
 
-    if message.channel.name == 'start-stop-server':
-        user_message = message.content.lower()
+    # Basic Hello Command
+    if message.content.lower() == '?hello':
+        await message.channel.send(f'Hello {message.author.display_name}! I am ready to manage the server.')
+
+    # Server Start Command
+    if message.content.lower() == '?server_start':
+        await message.channel.send("⏳ Attempting to wake up the Aternos server...")
         
-        if user_message == '?hello':
-            await message.channel.send(f'Hello {message.author.display_name}!')
-
-        elif user_message == '?server_start':
-            if myserv is None:
-                await message.channel.send("Error: Bot isn't connected to Aternos. Check the session cookie!")
-                return
-                
-            myserv.start()
-            await message.channel.send("Attempting to start... checking status.")
-            
-            while True:
-                ping = str(os.popen('mcstatus fridayssmpnew.aternos.me status | grep description').read())
-                if "offline" in ping.lower():
-                    time.sleep(5)
+        # Try to connect
+        myserv = get_aternos_server()
+        
+        if myserv:
+            try:
+                # Check current status first
+                myserv.fetch() 
+                if myserv.status == 'online':
+                    await message.channel.send("✅ The server is already online!")
+                elif myserv.status == 'starting':
+                    await message.channel.send("⏳ The server is already starting up...")
                 else:
-                    break
-            
-            await message.channel.send("Server is now alive!!! Join at: ||fridayssmpnew.aternos.me:62220||")
+                    # Actually start the server
+                    myserv.start()
+                    await message.channel.send("🚀 Start signal sent! I'll let you know if it needs confirmation.")
+            except Exception as e:
+                await message.channel.send(f"❌ Failed to start: `{str(e)}`")
+        else:
+            await message.channel.send("❌ Error: Could not connect to Aternos. Your session cookie may be invalid or blocked by Cloudflare.")
 
-        elif user_message == '?server_stop':
-            if myserv:
-                myserv.stop()
-                await message.channel.send('Server stopped.')
-            else:
-                await message.channel.send("Error: Not connected to Aternos.")
-
-# Start the web server
-keep_alive()
-
-# Start the Discord Bot
-client.run(TOKEN)
+# Start the bot
+if TOKEN:
+    client.run(TOKEN)
+else:
+    print("ERROR: No DISCORD_TOKEN found in environment variables.")
