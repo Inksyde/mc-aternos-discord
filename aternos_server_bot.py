@@ -3,11 +3,13 @@ import os
 from python_aternos import Client
 import time
 
-TOKEN = os.environ.get("DISCORD_TOKEN")
+TOKEN = os.environ["DISCORD TOKEN"]
+aternos_user = os.getenv('ATERNOS_USER')
+aternos_pass = os.getenv('ATERNOS_PASS')
 
 client = discord.Client()
 
-aternos = Client('fridayssmp', password='Its Friday')
+aternos = Client(aternos_user, password=aternos_pass)
 
 atservers = aternos.servers
 
