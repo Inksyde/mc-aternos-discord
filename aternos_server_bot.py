@@ -13,7 +13,6 @@ def home():
     return "Bot is alive!"
 
 def run_web_server():
-    # Render uses port 8080 or 10000 usually; 0.0.0.0 makes it public
     app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
@@ -23,15 +22,21 @@ def keep_alive():
 
 # Environment Variables
 TOKEN = os.environ.get("DISCORD_TOKEN")
-aternos_user = os.getenv('ATERNOS_USER')
-aternos_pass = os.getenv('ATERNOS_PASS')
+# We use the session cookie now to bypass the login screen
+ATERNOS_SESSION = os.environ.get("ATERNOS_SESSION")
 
 client = discord.Client()
 
-# Connect to Aternos
-aternos = Client(aternos_user, password=aternos_pass)
-atservers = aternos.servers
-myserv = atservers[0]
+# Connect to Aternos using the Session Cookie
+try:
+    # This bypasses the username/password login page
+    aternos = Client.from_cookies(ATERNOS_SESSION)
+    atservers = aternos.servers
+    myserv = atservers[0]
+    print("Successfully connected to Aternos via Session!")
+except Exception as e:
+    print(f"Aternos Connection Error: {e}")
+    myserv = None
 
 @client.event
 async def on_ready():
@@ -39,39 +44,40 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    username = str(message.author).split('#')[0]
-    user_message = str(message.content)
-    
     if message.author == client.user:
         return
 
-    # Check for the specific channel
     if message.channel.name == 'start-stop-server':
+        user_message = message.content.lower()
         
-        if user_message.lower() == '?hello':
-            await message.channel.send(f'Hello {username}!')
+        if user_message == '?hello':
+            await message.channel.send(f'Hello {message.author.display_name}!')
 
-        elif user_message.lower() == '?server_start':
+        elif user_message == '?server_start':
+            if myserv is None:
+                await message.channel.send("Error: Bot isn't connected to Aternos. Check the session cookie!")
+                return
+                
             myserv.start()
             await message.channel.send("Attempting to start... checking status.")
             
-            # Note: This while loop might block the bot for a long time. 
-            # In a busy bot, you'd use an async loop, but for a private server this works.
             while True:
-                # Optimized ping check
                 ping = str(os.popen('mcstatus fridayssmpnew.aternos.me status | grep description').read())
                 if "offline" in ping.lower():
-                    time.sleep(5) # Increased sleep to avoid spamming the shell
+                    time.sleep(5)
                 else:
                     break
             
             await message.channel.send("Server is now alive!!! Join at: ||fridayssmpnew.aternos.me:62220||")
 
-        elif user_message.lower() == '?server_stop':
-            myserv.stop()
-            await message.channel.send(f'Server stopped.')
+        elif user_message == '?server_stop':
+            if myserv:
+                myserv.stop()
+                await message.channel.send('Server stopped.')
+            else:
+                await message.channel.send("Error: Not connected to Aternos.")
 
-# Start the web server first
+# Start the web server
 keep_alive()
 
 # Start the Discord Bot
