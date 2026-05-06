@@ -1,77 +1,70 @@
 import discord
 import os
-import asyncio
+import time
 from python_aternos import Client
 
-# --- CONFIGURATION ---
-TOKEN = os.environ.get('DISCORD_TOKEN')
-ATERNOS_SESSION = os.environ.get('ATERNOS_SESSION')
+# --- 1. Load Environment Variables ---
+TOKEN = os.getenv('DISCORD_TOKEN')
+ATERNOS_USER = os.getenv('ATERNOS_USER')
+ATERNOS_PASS = os.getenv('ATERNOS_PASS')
 
-# Initialize Discord Bot
+# --- 2. Initialize Aternos (v3.2+ Style) ---
+at_client = Client()
+# Log in first
+at_client.login(ATERNOS_USER, ATERNOS_PASS)
+
+# Get the account and then the servers
+aternos_account = at_client.account
+at_servers = aternos_account.list_servers()
+myserv = at_servers[0]
+
+# --- 3. Initialize Discord ---
 intents = discord.Intents.default()
-intents.message_content = True
+intents.message_content = True 
 client = discord.Client(intents=intents)
-
-def get_aternos_server():
-    """Attempts to connect to Aternos and return the server object."""
-    try:
-        # Connect using the session cookie
-        at = Client.from_cookies(ATERNOS_SESSION)
-        
-        # Get the list of servers
-        at_servers = at.list_servers()
-        
-        if not at_servers:
-            print("ERROR: No servers found on this Aternos account.")
-            return None
-            
-        # Return the first server in the account
-        return at_servers[0]
-    except Exception as e:
-        print(f"DEBUG: Aternos Connection Error: {e}")
-        return None
 
 @client.event
 async def on_ready():
-    print(f'Logged in as {client.user} (ID: {client.user.id})')
-    print('------')
+    print(f'Logged in as {client.user}')
 
 @client.event
 async def on_message(message):
-    # Ignore messages from the bot itself
     if message.author == client.user:
         return
 
-    # Basic Hello Command
-    if message.content.lower() == '?hello':
-        await message.channel.send(f'Hello {message.author.display_name}! I am ready to manage the server.')
+    # Use .lower() so '?HELLO' or '?Hello' both work
+    user_message = message.content.lower()
+    username = str(message.author).split('#')[0]
 
-    # Server Start Command
-    if message.content.lower() == '?server_start':
-        await message.channel.send("⏳ Attempting to wake up the Aternos server...")
+    if message.channel.name == 'aternos-server':
         
-        # Try to connect
-        myserv = get_aternos_server()
-        
-        if myserv:
-            try:
-                # Check current status first
+        if user_message == '?hello':
+            await message.channel.send(f'Hello {username}!')
+
+        elif user_message == '?server_start':
+            await message.channel.send("Attempting to start the server...")
+            myserv.start()
+            
+            # Polling loop to check status
+            while True:
+                # Update server info from Aternos
                 myserv.fetch() 
                 if myserv.status == 'online':
-                    await message.channel.send("✅ The server is already online!")
-                elif myserv.status == 'starting':
-                    await message.channel.send("⏳ The server is already starting up...")
+                    break
+                elif myserv.status == 'loading' or myserv.status == 'starting':
+                    time.sleep(10) # Wait 10 seconds before checking again
                 else:
-                    # Actually start the server
-                    myserv.start()
-                    await message.channel.send("🚀 Start signal sent! I'll let you know if it needs confirmation.")
-            except Exception as e:
-                await message.channel.send(f"❌ Failed to start: `{str(e)}`")
-        else:
-            await message.channel.send("❌ Error: Could not connect to Aternos. Your session cookie may be invalid or blocked by Cloudflare.")
+                    # If it's still offline or in queue, keep waiting
+                    time.sleep(10)
+            
+            await message.channel.send("Server is now alive!!! You can join in 2-3 minutes.")
 
-# Start the bot
+        elif user_message == '?server_stop':
+            myserv.stop()
+            await message.channel.send('Server stop signal sent.')
+
+# --- 4. Run the Bot ---
 if TOKEN:
     client.run(TOKEN)
 else:
-    print("ERROR: No DISCORD_TOKEN found in environment variables.")
+    print("Error: DISCORD_TOKEN not found in environment variables.")
