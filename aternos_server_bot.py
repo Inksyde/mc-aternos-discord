@@ -4,33 +4,23 @@ import time
 from python_aternos import Client
 
 # --- 1. Load Environment Variables ---
-# Ensure these are set in the Render "Environment" tab
 TOKEN = os.getenv('DISCORD_TOKEN')
 ATERNOS_SESSION = os.getenv('ATERNOS_SESSION')
 
 print("--- System: Initializing Bot ---")
 
-# --- 2. Initialize Aternos Client (v3.0.0 compatible) ---
+# --- 2. Initialize Aternos Client (v3.0.0 fix) ---
 try:
     print("System: Connecting to Aternos via Session Cookie...")
     
-    # In v3.0.0, we set the session cookie during initialization
-    at_client = Client(session=ATERNOS_SESSION)
-    
-    # Alternatively, if that fails, try setting the attribute directly:
-    # at_client = Client()
-    # at_client.atconn.session.cookies.set('ATERNOS_SESSION', ATERNOS_SESSION, domain='aternos.org')
+    # Correct way for v3.0.0 to handle sessions
+    at_client = Client()
+    at_client.atconn.session.cookies.set('ATERNOS_SESSION', ATERNOS_SESSION, domain='aternos.org')
 
     at_servers = at_client.list_servers()
     if not at_servers:
         print("Error: No servers found on this Aternos account.")
         exit(1)
-        
-    myserv = at_servers[0]
-    print(f"System: Successfully linked to server: {myserv.address}")
-except Exception as e:
-    print(f"Error during Aternos Login: {e}")
-    exit(1)
         
     myserv = at_servers[0]
     print(f"System: Successfully linked to server: {myserv.address}")
@@ -46,22 +36,19 @@ client = discord.Client(intents=intents)
 @client.event
 async def on_ready():
     print(f'System: Discord Bot is Live! Logged in as: {client.user}')
-    print("--- System: Ready for Commands ---")
+    print("--- System: Monitoring #aternos-server ---")
 
 @client.event
 async def on_message(message):
-    # Ignore messages from the bot itself
     if message.author == client.user:
         return
 
-    # Basic Logging for the Console
     username = str(message.author).split('#')[0]
-    user_message = message.content.lower()
+    user_message = message.content.lower().strip()
     channel = str(message.channel.name)
     
-    # Only process commands in the specific channel
     if channel == 'aternos-server':
-        print(f"User Log: {username} sent '{user_message}' in #{channel}")
+        print(f"User Log: {username} sent '{user_message}'")
 
         if user_message == '?hello':
             await message.channel.send(f'Hello {username}!')
@@ -72,36 +59,27 @@ async def on_message(message):
             
             try:
                 myserv.start()
-                
-                # Polling loop to check status
                 while True:
-                    myserv.fetch() # Refresh server data from Aternos
-                    print(f"Status Check: Server is currently {myserv.status}")
-                    
+                    myserv.fetch() 
+                    print(f"Status Check: {myserv.status}")
                     if myserv.status == 'online':
                         break
-                    elif myserv.status in ['loading', 'starting']:
-                        time.sleep(15) # Wait 15 seconds between checks
-                    else:
-                        # Handles 'offline' or 'queue'
-                        time.sleep(15)
+                    time.sleep(15) 
                 
                 await message.channel.send(f"Server is now **LIVE**! 🚀\nAddress: ||{myserv.address}:{myserv.port}||")
-                print("Action: Server start sequence complete.")
                 
             except Exception as e:
                 print(f"Error during server start: {e}")
-                await message.channel.send("Failed to start the server. Check my logs for details.")
+                await message.channel.send("Failed to start. Check logs.")
 
         elif user_message == '?server_stop':
             print("Action: Stopping server...")
             myserv.stop()
             await message.channel.send('Server stop signal sent. 🛑')
 
-# --- 4. Launch Bot ---
 if TOKEN:
     print("System: Attempting to connect to Discord...")
     client.run(TOKEN)
 else:
-    print("Error: DISCORD_TOKEN not found in Environment Variables.")
+    print("Error: DISCORD_TOKEN not found.")
     exit(1)
