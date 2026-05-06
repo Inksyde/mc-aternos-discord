@@ -10,16 +10,27 @@ ATERNOS_SESSION = os.getenv('ATERNOS_SESSION')
 
 print("--- System: Initializing Bot ---")
 
-# --- 2. Initialize Aternos Client ---
+# --- 2. Initialize Aternos Client (v3.0.0 compatible) ---
 try:
     print("System: Connecting to Aternos via Session Cookie...")
-    at_client = Client()
-    at_client.set_session(ATERNOS_SESSION)
     
+    # In v3.0.0, we set the session cookie during initialization
+    at_client = Client(session=ATERNOS_SESSION)
+    
+    # Alternatively, if that fails, try setting the attribute directly:
+    # at_client = Client()
+    # at_client.atconn.session.cookies.set('ATERNOS_SESSION', ATERNOS_SESSION, domain='aternos.org')
+
     at_servers = at_client.list_servers()
     if not at_servers:
         print("Error: No servers found on this Aternos account.")
         exit(1)
+        
+    myserv = at_servers[0]
+    print(f"System: Successfully linked to server: {myserv.address}")
+except Exception as e:
+    print(f"Error during Aternos Login: {e}")
+    exit(1)
         
     myserv = at_servers[0]
     print(f"System: Successfully linked to server: {myserv.address}")
