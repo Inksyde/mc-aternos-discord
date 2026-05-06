@@ -5,15 +5,20 @@ from python_aternos import Client
 
 # --- 1. Load Environment Variables ---
 TOKEN = os.getenv('DISCORD_TOKEN')
-ATERNOS_USER = os.getenv('ATERNOS_USER')
-ATERNOS_PASS = os.getenv('ATERNOS_PASS')
+# We now use only the session cookie
+ATERNOS_SESSION = os.getenv('ATERNOS_SESSION')
 
+# --- 2. Initialize Aternos (Cookie Method) ---
 at_client = Client()
-at_client.login(ATERNOS_USER, ATERNOS_PASS)
 
-# In 3.0.x, you get servers directly from the client
+# This bypasses the Cloudflare login screen entirely!
+at_client.set_session(ATERNOS_SESSION) 
+
+# Fetch servers
 at_servers = at_client.list_servers()
 myserv = at_servers[0]
+
+# ... rest of your Discord bot code ...
 
 # --- 3. Initialize Discord ---
 intents = discord.Intents.default()
