@@ -9,17 +9,20 @@ ATERNOS_SESSION = os.getenv('ATERNOS_SESSION')
 
 print("--- System: Initializing Bot ---")
 
-# --- 2. Initialize Aternos Client (v3.0.0 fix) ---
+# --- 2. Initialize Aternos Client (v3.0.0 property fix) ---
 try:
     print("System: Connecting to Aternos via Session Cookie...")
     
-    # Correct way for v3.0.0 to handle sessions
+    # Initialize the client
     at_client = Client()
     at_client.atconn.session.cookies.set('ATERNOS_SESSION', ATERNOS_SESSION, domain='aternos.org')
 
-    at_servers = at_client.list_servers()
+    # In v3.0.0, servers are often accessed via the 'servers' property
+    # We call .list_servers(cache=False) to force a fresh pull from the API
+    at_servers = at_client.list_servers() 
+    
     if not at_servers:
-        print("Error: No servers found on this Aternos account.")
+        print("Error: No servers found. Check if your ATERNOS_SESSION is correct.")
         exit(1)
         
     myserv = at_servers[0]
