@@ -8,14 +8,11 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 ATERNOS_USER = os.getenv('ATERNOS_USER')
 ATERNOS_PASS = os.getenv('ATERNOS_PASS')
 
-# --- 2. Initialize Aternos (v3.2+ Style) ---
 at_client = Client()
-# Log in first
 at_client.login(ATERNOS_USER, ATERNOS_PASS)
 
-# Get the account and then the servers
-aternos_account = at_client.account
-at_servers = aternos_account.list_servers()
+# In 3.0.x, you get servers directly from the client
+at_servers = at_client.list_servers()
 myserv = at_servers[0]
 
 # --- 3. Initialize Discord ---
